@@ -17,6 +17,7 @@ class RideHistory extends Model
         'ride_date',
         'pickup_location',
         'dropoff_location',
+        'details',
         'fare',
         'status',
     ];
@@ -35,6 +36,11 @@ class RideHistory extends Model
     public function rideLocations()
     {
         return $this->hasOne(RideLocation::class, 'ride_id', 'ride_id');
+    }
+
+    public function applications()
+    {
+        return $this->hasMany(Application::class, 'ride_id');
     }
 
     public function feedbacks()

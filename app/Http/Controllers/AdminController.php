@@ -143,4 +143,13 @@ class AdminController extends Controller
         ]);
     }
 
+    public function getRiderLocations()
+    {
+        $riders = Rider::where('availability', 'Available')
+            ->with(['user'])
+            ->get();
+
+        return response()->json($riders);
+    }
+
 }

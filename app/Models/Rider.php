@@ -15,8 +15,12 @@ class Rider extends Model
         'user_id',
         'registration_date',
         'verification_status',
+        'last_payment_date',
+        'rider_latitude',
+        'rider_longitude',
+        'availability'
     ];
-
+    
     protected static function booted()
     {
         static::creating(function ($rider) {

@@ -12,8 +12,6 @@ class RideLocation extends Model
     protected $table = 'ride_locations';
 
     protected $fillable = [
-        'rider_latitude',
-        'rider_longitude',
         'customer_latitude',
         'customer_longitude',
         'dropoff_latitude',

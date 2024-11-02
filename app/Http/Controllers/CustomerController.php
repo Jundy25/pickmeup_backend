@@ -9,8 +9,22 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
+use App\Events\RidesUpdated;
+use App\Events\DashboardUpdated;
+
+use App\Services\DashboardService;
+
 class CustomerController extends Controller
 {
+
+    protected $dashboardService;
+
+    public function __construct(DashboardService $dashboardService)
+    {
+        $this->dashboardService = $dashboardService;
+    }
+
+
     public function getCustomers()
     {
         $customers = User::where('role_id', User::ROLE_CUSTOMER)->get(['user_id', 'first_name', 'last_name', 'mobile_number', 'status']);
@@ -35,13 +49,12 @@ class CustomerController extends Controller
 
     public function getCustomerById($user_id)
     {
-        $user = User::where('role_id', User::ROLE_CUSTOMER)
-            ->where('user_id', $user_id) // Ensure user_id is correct, assuming it's a valid column
+        $user = User::where('user_id', $user_id) // Ensure user_id is correct, assuming it's a valid column
             ->first(); // Fetch a single record
 
         // Check if the user exists
         if (!$user) {
-            return response()->json(['message' => 'Rider not found'], 404);
+            return response()->json(['message' => 'User not found'], 404);
         }
 
         // Check if the user's status is "Disabled"
@@ -63,7 +76,7 @@ class CustomerController extends Controller
             'fare' => 'required|numeric',
             'ride_type' => 'required',
         ]);
-
+    
         $rideHistory = new RideHistory();
         $rideHistory->user_id = $validated['user_id'];
         $rideHistory->pickup_location = $validated['pickup_location'];
@@ -74,8 +87,26 @@ class CustomerController extends Controller
         $rideHistory->status = 'Available';
         $rideHistory->save();
 
-        return response()->json(['success' => true, 'ride_id' => $rideHistory->ride_id], 201);
+        // Fetch all available rides to send in the event
+        $rides = RideHistory::where('ride_histories.status', 'Available') 
+            ->join('users', 'ride_histories.user_id', '=', 'users.user_id')
+            ->select('ride_histories.*', 'users.first_name', 'users.last_name')
+            ->orderBy('ride_histories.created_at', 'desc')
+            ->with(['user', 'ridelocations'])
+            ->get();
+        // Dispatch the RidesUpdated event with the available rides
+        event(new RidesUpdated($rides));
+
+        // Fetch updated counts and bookings using DashboardService
+        $data = $this->dashboardService->getCounts();
+        $counts = $data['counts'];
+        $bookings = $data['bookings'];
+
+        event(new DashboardUpdated($counts, $bookings));
+    
+            return response()->json(['success' => true, 'ride_id' => $rideHistory->ride_id], 201);
     }
+
 
 
 
@@ -84,6 +115,21 @@ class CustomerController extends Controller
         $activeRide = RideHistory::where('user_id', $user_id)
             ->whereIn('status', ['Available', 'Booked', 'In Transit', 'Review'])
             ->with(['user', 'rider'])
+            ->latest()
+            ->first();
+
+        return response()->json([
+            'hasActiveRide' => $activeRide !== null,
+            'rideDetails' => $activeRide
+        ]);
+    }
+
+
+    public function viewApplications($user_id)
+    {
+        $activeRide = RideApplication::where('ride_id', $ride_id)
+            ->whereIn('status', ['Available', 'Booked', 'In Transit', 'Review'])
+            ->with(['ridehistory', 'rider'])
             ->latest()
             ->first();
 
@@ -105,6 +151,24 @@ class CustomerController extends Controller
         // Logic to cancel the ride
         $ride->status = 'Canceled';
         $ride->save();
+
+        // Fetch all available rides to send in the event
+        $rides = RideHistory::where('ride_histories.status', 'Available') 
+            ->join('users', 'ride_histories.user_id', '=', 'users.user_id')
+            ->select('ride_histories.*', 'users.first_name', 'users.last_name')
+            ->orderBy('ride_histories.created_at', 'desc')
+            ->with(['user', 'ridelocations'])
+            ->get();
+
+        // Dispatch the RidesUpdated event with the available rides
+        event(new RidesUpdated($rides));
+
+        // Fetch updated counts and bookings using DashboardService
+        $data = $this->dashboardService->getCounts();
+        $counts = $data['counts'];
+        $bookings = $data['bookings'];
+        
+        event(new DashboardUpdated($counts, $bookings));
     
         return response()->json(['message' => 'Ride successfully canceled']);
     }

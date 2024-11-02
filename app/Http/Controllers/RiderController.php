@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Rider;
 use App\Models\RequirementPhoto;
+use App\Models\RideApplication;
 use App\Models\Requirement;
 use App\Models\RideHistory;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+
+use App\Events\RidesUpdated;
 
 
 
@@ -33,38 +36,60 @@ class RiderController extends Controller
         return response()->json($riders);
     }
 
+    public function updateAvailability(Request $request)
+    {
+        $rider = Rider::where('user_id', $request->input('user_id'))->first();
+    
+        if ($rider) {
+            $rider->rider_latitude = $request->input('latitude');
+            $rider->rider_longitude = $request->input('longitude');
+            $rider->availability = $request->input('status');
+            
+            $rider->save();
+    
+            return response()->json($rider);
+        } else {
+            return response()->json(['error' => 'Rider not found'], 404);
+        }
+    }
+
     public function getRiderById($user_id)
     {
-        // Fetch the user associated with the rider role
         $user = User::where('role_id', User::ROLE_RIDER)
-            ->where('user_id', $user_id) // Ensure user_id is correct, assuming it's a valid column
-            ->first(); // Fetch a single record
+            ->where('user_id', $user_id)
+            ->first();
 
-        // Check if the user exists
         if (!$user) {
             return response()->json(['message' => 'Rider not found'], 404);
         }
 
-        // Fetch the rider associated with the user_id
         $rider = Rider::where('user_id', $user_id)->first();
 
-        // Check if the rider exists
         if (!$rider) {
             return response()->json(['message' => 'Rider not found'], 404);
         }
 
-        // Check if the rider's verification status is "Unverified" or "Pending"
         if (in_array($rider->verification_status, ['Unverified', 'Pending'])) {
             return response()->json(['message' => 'Get Verified'], 200);
         }
 
-        // Check if the user's status is "Disabled"
         if ($user->status === 'Disabled') {
             return response()->json(['message' => 'Account Disabled'], 200);
         }
 
-        // If neither condition is met, return the rider's data
         return response()->json($rider, 200);
+    }
+
+    public function getAvailableRides()
+    {
+        $availableRides = RideHistory::where('ride_histories.status', 'Available') 
+            ->join('users', 'ride_histories.user_id', '=', 'users.user_id')
+            ->select('ride_histories.*', 'users.first_name', 'users.last_name')
+            ->orderBy('ride_histories.created_at', 'desc')
+            ->with(['user', 'ridelocations'])
+            ->get();
+    
+        return response()->json($availableRides);
     }
 
     public function getRidersRequirements()
@@ -263,18 +288,6 @@ class RiderController extends Controller
         }
     }
 
-    public function getAvailableRides()
-    {
-        $availableRides = RideHistory::where('ride_histories.status', 'Available') 
-            ->join('users', 'ride_histories.user_id', '=', 'users.user_id')
-            ->select('ride_histories.*', 'users.first_name', 'users.last_name')
-            ->orderBy('ride_histories.created_at', 'desc')
-            ->with(['user', 'ridelocations'])
-            ->get();
-    
-        return response()->json($availableRides);
-    }
-
     
     public function accept_ride(Request $request, $ride_id)
     {
@@ -296,7 +309,7 @@ class RiderController extends Controller
 
                 if (!$ride) {
                     Log::warning("Ride not available for acceptance: " . $ride_id);
-                    return response()->json(['error' => 'This ride is no longer available.'], 400);
+                    return response()->json(['message' => 'This ride is no longer available.'], 200);
                 }
 
                 // Update the ride status and assign the rider_id
@@ -305,6 +318,56 @@ class RiderController extends Controller
                 $ride->save();
 
                 Log::info("Ride accepted successfully: " . $ride_id);
+                return response()->json(['message' => 'Ride Accepted Successfully.']);
+            });
+        } catch (\Exception $e) {
+            Log::error("Failed to accept ride: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to accept ride. Please try again.'], 500);
+        }
+    }
+
+    public function apply_ride(Request $request, $ride_id)
+    {
+        Log::info("Attempting to apply ride with ID: " . $ride_id);
+
+        try {
+            return DB::transaction(function () use ($ride_id, $request) {
+                $validated = $request->validate([
+                    'user_id' => 'required|exists:users,user_id',
+                ]);
+
+                $user_id = $validated['user_id'];
+
+                
+                $ride = RideHistory::where('ride_id', $ride_id)
+                                ->where('status', 'Available')
+                                ->lockForUpdate()
+                                ->first();
+
+                if (!$ride) {
+                    Log::warning("Ride not available for acceptance: " . $ride_id);
+                    return response()->json(['message' => 'This ride is no longer available.'], 200);
+                }
+                
+                $check = RideApplication::where('ride_id', $ride_id)
+                                ->where('applier', $user_id)
+                                ->lockForUpdate()
+                                ->first();
+
+                if ($check) {
+                    Log::warning("You have already applied for this ride: " . $ride_id);
+                    return response()->json(['message' => 'exist'], 200);
+                }
+
+                $apply = new RideApplication();
+                $apply->ride_id = $ride_id;
+                $apply->applier = $user_id;
+                $apply->status = 'Pending';
+                $apply->apply_to = $ride->user_id;
+                $apply->date = now();
+                $apply->save();
+
+                Log::info("Ride Application successfully: " . $ride_id);
                 return response()->json(['message' => 'Ride Accepted Successfully.']);
             });
         } catch (\Exception $e) {
@@ -340,7 +403,7 @@ class RiderController extends Controller
         $ride->status = 'In Transit';
         $ride->save();
     
-        return response()->json(['message' => 'Ride successfully ended']);
+        return response()->json(['message' => 'Now In Transit']);
     }
 
     public function finish_ride(Request $request, $ride_id)

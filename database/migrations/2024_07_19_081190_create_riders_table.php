@@ -13,6 +13,10 @@ class CreateRidersTable extends Migration
             $table->unsignedBigInteger('user_id');
             $table->date('registration_date');
             $table->text('verification_status');
+            $table->date('last_payment_date')->nullable();
+            $table->decimal('rider_latitude', 10, 8)->nullable();
+            $table->decimal('rider_longitude', 11, 8)->nullable();
+            $table->text('availability')->nullable();
             $table->timestamps();
 
             $table->foreign('user_id')->references('user_id')->on('users');

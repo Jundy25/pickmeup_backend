@@ -4,7 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-class CreateDeliveryTable extends Migration
+class CreatePakyawTable extends Migration
 {
     public function up()
     {
@@ -12,8 +12,7 @@ class CreateDeliveryTable extends Migration
             $table->id('pakyaw_id');
             $table->unsignedBigInteger('ride_id');
             $table->dateTime('ride_date');
-            $table->string('pakyaw_type');
-            $table->int('number_of_riders');
+            $table->integer('number_of_riders');
             $table->string('pickup_location');
             $table->string('dropoff_location');
             $table->string('description');
@@ -27,6 +26,6 @@ class CreateDeliveryTable extends Migration
 
     public function down()
     {
-        Schema::dropIfExists('delivery');
+        Schema::dropIfExists('pakyaw');
     }
 }

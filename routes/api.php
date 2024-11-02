@@ -43,10 +43,15 @@ Route::prefix('/user')->group(function() {
     Route::post('/update-rider-info', [RiderController::class, 'updateRiderInfo'])->middleware('auth:sanctum');
     Route::get('/requirement_photos/{rider_id}', [RiderController::class, 'getUploadedImages']);
 
+
+
+    
+    Route::put('rider_available', [RiderController::class, 'updateAvailability']);
     Route::put('rider/{user_id}/status', [CustomerController::class, 'updateStatus']);
     Route::get('/available-rides', [RiderController::class, 'getAvailableRides']);
     Route::get('riderId/{user_id}', [RiderController::class, 'getRiderById']);
     Route::put('/accept_ride/{ride_id}', [RiderController::class, 'accept_ride']);
+    Route::post('/apply_ride/{ride_id}', [RiderController::class, 'apply_ride']);
     Route::get('check-active-ride/{user_id}', [RiderController::class, 'checkActiveRide']);
     Route::put('/start_ride/{ride_id}', [RiderController::class, 'start_ride']);
     Route::put('/finish_ride/{ride_id}', [RiderController::class, 'finish_ride']);
@@ -66,6 +71,7 @@ Route::prefix('/user')->group(function() {
     Route::put('admin/{user_id}/status', [AdminController::class, 'updateStatus']);
     Route::put('/update_admin/{id}', [AdminController::class, 'updateAdmin']);
     Route::put('/verify_rider/{user_id}', [AdminController::class, 'verify_rider']);
+    Route::get('/riders/locations', [AdminController::class, 'getRiderLocations']);
     
     Route::get('/history', [HistoryController::class, 'index']);
     Route::get('/cus_history/{user_id}', [HistoryController::class, 'customerHistory']);

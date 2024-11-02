@@ -19,6 +19,10 @@ class DashboardController extends Controller
         $disabledRidersCount = User::where('role_id', User::ROLE_RIDER)
             ->where('status', 'Disabled')
             ->count();
+
+        $admincount = User::where('role_id', User::ROLE_ADMIN)
+            ->where('status', 'Active')
+            ->count();
     
         $customersCount = User::where('role_id', User::ROLE_CUSTOMER)->count();
         
@@ -27,12 +31,13 @@ class DashboardController extends Controller
         $verified = Rider::where('verification_status', 'Verified')
             ->count();
 
-        $pending = Rider::where('verification_status', 'Verified')
+        $pending = Rider::where('verification_status', 'Pending')
             ->count();
 
         $counts = [
             'active_riders' => $activeRidersCount,
             'disabled_riders' => $disabledRidersCount,
+            'admincount' => $admincount,
             'customers' => $customersCount,
             'completed_rides' => $completedRidesCount,
             'verified' => $verified,
@@ -44,9 +49,6 @@ class DashboardController extends Controller
             ->orderBy('created_at', 'desc')
             ->limit(5) // Adjust the limit as needed
             ->get();
-
-        // Broadcast the event
-        broadcast(new DashboardUpdated($counts, $bookings));
 
         return response()->json([
             'counts' => $counts,

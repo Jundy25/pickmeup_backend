@@ -11,13 +11,16 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('confirmations', function (Blueprint $table) {
-            $table->id();
-            $table->string('email');
-            $table->string('mobile_number', 13);
-            $table->string('otp', 4);
+        Schema::create('ride_applications', function (Blueprint $table) {
+            $table->id('apply_id');
+            $table->unsignedBigInteger('ride_id');
+            $table->integer('applier');
+            $table->dateTime('date');
+            $table->integer('apply_to');
             $table->string('status');
             $table->timestamps();
+
+            $table->foreign('ride_id')->references('ride_id')->on('ride_histories')->onDelete('cascade');
         });
     }
 
@@ -26,6 +29,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('confirmation');
+        Schema::dropIfExists('ride_applications');
     }
 };

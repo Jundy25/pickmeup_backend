@@ -11,8 +11,6 @@ class CreateRideLocationsTable extends Migration
         Schema::create('ride_locations', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('ride_id');
-            $table->decimal('rider_latitude', 10, 8)->nullable();
-            $table->decimal('rider_longitude', 11, 8)->nullable();
             $table->decimal('customer_latitude', 10, 8);
             $table->decimal('customer_longitude', 11, 8);
             $table->decimal('dropoff_latitude', 11, 8);

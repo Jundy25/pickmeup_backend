@@ -137,7 +137,6 @@ class AuthController extends Authenticatable
     }
 
 
-
     public function logoutAccount(Request $request) {
         try {
             $request->user()->currentAccessToken()->delete();
