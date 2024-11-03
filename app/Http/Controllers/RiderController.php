@@ -302,6 +302,17 @@ class RiderController extends Controller
 
                 $user_id = $validated['user_id'];
 
+                $application = RideApplication::where('ride_id', $ride_id)
+                                ->where('status', 'Matched')
+                                ->lockForUpdate()
+                                ->first();
+                if (!$application) {
+                    Log::warning("Ride not available for acceptance: " . $ride_id);
+                    return response()->json(['message' => 'This ride is no longer available.'], 200);
+                }     
+                $application->status = 'Matched';
+                $application->save();   
+
                 $ride = RideHistory::where('ride_id', $ride_id)
                                 ->where('status', 'Available')
                                 ->lockForUpdate()
@@ -368,7 +379,7 @@ class RiderController extends Controller
                 $apply->save();
 
                 Log::info("Ride Application successfully: " . $ride_id);
-                return response()->json(['message' => 'Ride Accepted Successfully.']);
+                return response()->json(['message' => 'Applied Successfully.']);
             });
         } catch (\Exception $e) {
             Log::error("Failed to accept ride: " . $e->getMessage());

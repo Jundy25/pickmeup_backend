@@ -25,7 +25,10 @@ class RidesBooked implements ShouldBroadcast
     public function broadcastOn()
     {
         // Broadcasting to both user and rider on their private channels
-        return new Channel('rides');
+        return [
+            new PrivateChannel('user.' . $this->ride->user_id),
+            new PrivateChannel('user.' . $this->ride->rider_id)
+        ];
     }
 
     public function broadcastAs()

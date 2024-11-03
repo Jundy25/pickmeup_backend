@@ -65,6 +65,8 @@ Route::prefix('/user')->group(function() {
     Route::get('latest-available2/{user_id}', [CustomerController::class, 'getLatestAvailableRide2']);
     Route::put('cancel_ride/{ride_id}', [CustomerController::class, 'cancelRide']);
     Route::put('/complete_ride/{ride_id}', [CustomerController::class, 'finish_ride']);
+    Route::get('/riders_apply', [CustomerController::class, 'viewApplications']);
+    Route::get('/riders_loc', [CustomerController::class, 'getRiderLocations']);
 
     Route::get('/admin', [AdminController::class, 'getAdmin']);
     Route::get('/admin/{id}', [AdminController::class, 'show']);
@@ -72,6 +74,7 @@ Route::prefix('/user')->group(function() {
     Route::put('/update_admin/{id}', [AdminController::class, 'updateAdmin']);
     Route::put('/verify_rider/{user_id}', [AdminController::class, 'verify_rider']);
     Route::get('/riders/locations', [AdminController::class, 'getRiderLocations']);
+    
     
     Route::get('/history', [HistoryController::class, 'index']);
     Route::get('/cus_history/{user_id}', [HistoryController::class, 'customerHistory']);

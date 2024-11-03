@@ -6,8 +6,26 @@ use App\Models\RideLocation;
 use App\Models\RideHistory;
 use Illuminate\Http\Request;
 
+
+use App\Events\RidesUpdated;
+use App\Events\DashboardUpdated;
+
+use App\Services\DashboardService;
+use App\Services\RidesService;
+use App\Services\FareService;
+
+
 class RideController extends Controller
 {
+    public function __construct(
+        DashboardService $dashboardService, 
+        RidesService $ridesService,)
+        // NotificationService $notificationService
+    {
+        $this->dashboardService = $dashboardService;
+        $this->ridesService = $ridesService;
+        // $this->notificationService = $notificationService;
+    }
 
     public function saveBookLocation(Request $request)
     {
@@ -26,6 +44,10 @@ class RideController extends Controller
         $rideLocation->dropoff_latitude = $request->dropoff_latitude;
         $rideLocation->dropoff_longitude = $request->dropoff_longitude;
         $rideLocation->save();
+
+        // Fetch all available rides to send in the event
+        $rides = $this->ridesService->getAvailableRides();
+        event(new RidesUpdated($rides));
 
         return response()->json(['message' => 'Ride location saved successfully']);
     }

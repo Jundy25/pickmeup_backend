@@ -16,8 +16,9 @@ class CreateRideHistoriesTable extends Migration
             $table->string('ride_type');
             $table->string('pickup_location');
             $table->string('dropoff_location');
-            $table->json('details')->nullable();
             $table->decimal('fare', 8, 2);
+            $table->string('distance');
+            $table->decimal('calculated_fare', 8, 2);
             $table->string('status');
             $table->timestamps();
 
