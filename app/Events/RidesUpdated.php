@@ -12,7 +12,7 @@ class RidesUpdated implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    protected $rides;
+    public $rides;
 
     public function __construct($rides)
     {
@@ -31,9 +31,8 @@ class RidesUpdated implements ShouldBroadcastNow
 
     public function broadcastWith()
     {
-        // Ensure the data is already transformed before broadcasting
         return [
-            'rides' => $this->rides->toArray()
+            'rides' => $this->rides
         ];
     }
 }
