@@ -7,36 +7,36 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use App\Models\RideHistory;
+use Illuminate\Support\Facades\Log;
 
-class RidesBooked implements ShouldBroadcast
+class RideApply implements ShouldBroadcastNow
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $apply;
+    public $applicationData;
 
-    public function __construct(RideHistory $ride)
+    public function __construct($applicationData)
     {
-        $this->apply = $apply;
+        $this->applicationData = $applicationData;
     }
 
     public function broadcastOn()
     {
-        new PrivateChannel('bookedrider.' . $this->ride->user_id);
-        new PrivateChannel('bookeduser.' . $this->ride->user_id);
+        return new Channel('application');
     }
 
     public function broadcastAs()
     {
-        return 'RIDE_BOOKED';
+        return 'RIDES_APPLY';
     }
 
     public function broadcastWith()
     {
         return [
-           'ride' => $this->ride
+            'applicationData' => $this->applicationData
         ];
     }
 }

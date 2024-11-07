@@ -9,6 +9,10 @@ use Illuminate\Http\Request;
 use App\Http\Requests\UpdateUserRequest;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\DB;
+
 
 class AdminController extends Controller
 {
@@ -17,6 +21,117 @@ class AdminController extends Controller
         $admin = User::where('role_id', User::ROLE_ADMIN)->get(['user_id', 'first_name', 'last_name', 'email', 'mobile_number', 'date_of_birth', 'user_name','gender', 'status']);
         return response()->json($admin);
     }
+
+    public function getAdminById($userId)
+    {
+        $user = User::where('user_id', $userId) 
+                    ->first();
+
+        // Check if the user exists
+        if (!$user) {
+            return response()->json(['message' => 'User not found'], 404);
+        }
+
+        // Check if the user's status is "Disabled"
+        if ($user->status === 'Disabled') {
+            return response()->json(['message' => 'Account Disabled'], 200);
+        }
+        // If condition is not met, return the rider's data
+        return response()->json($user, 200);
+    }
+
+    // public function updateAccount(Request $request, $userId)
+    // {
+
+    //     $user = User::findOrFail($userId); // Ensure the user exists
+    //     $user->user_name = $request->input('user_name');
+    //     $user->email = $request->input('email');
+    //     $user->user_name = $request->input('email');
+    //     $user->save();
+
+    //     return response()->json([
+    //         'message' => 'User status updated successfully',
+    //         'user' => $user
+    //     ]);
+    // }
+
+    public function updateProfile(Request $request, $userId)
+    {
+        \Log::info('Profile update request received', [
+            'userId' => $userId,
+            'request_data' => $request->all(),
+            'files' => $request->allFiles(),
+            'headers' => $request->headers->all(),
+            'request_content' => $request->getContent(),
+            'request_method' => $request->method(),
+        ]);
+
+        
+        try {
+            $user = User::findOrFail($userId);
+
+            $validator = Validator::make($request->all(), [
+                'user_name' => ['sometimes', 'string', 'max:255', Rule::unique('users')->ignore($user->user_id)],
+                'email' => ['sometimes', 'string', 'email', 'max:255', Rule::unique('users')->ignore($user->user_id)],
+                'currentPassword' => ['required_with:newPassword', 'string'],
+                'newPassword' => ['sometimes', 'string', 'min:8', 'confirmed'],
+                'profilePicture' => ['sometimes', 'image', 'max:2048'],
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json(['error' => $validator->errors()], 422);
+            }
+
+            DB::beginTransaction();
+
+            try {
+                // Handle password update
+                if ($request->filled('newPassword')) {
+                    if (!Hash::check($request->currentPassword, $user->password)) {
+                        return response()->json(['error' => 'Current password is incorrect'], 422);
+                    }
+                    $user->password = Hash::make($request->newPassword);
+                }
+
+                // Handle profile picture
+                if ($request->hasFile('profilePicture')) {
+                    // Delete old picture
+                    if ($user->profile_picture) {
+                        Storage::delete($user->profile_picture);
+                    }
+                    
+                    $path = $request->file('profilePicture')->store('profile_pictures', 'public');
+                    $user->profile_picture = $path;
+                }
+
+                // Update basic info
+                $user->fill($request->only(['user_name', 'email']));
+                $user->save();
+
+                DB::commit();
+
+                return response()->json([
+                    'message' => 'Profile updated successfully!',
+                    'user' => [
+                        'user_name' => $user->user_name,
+                        'email' => $user->email,
+                        'profile_picture' => $user->profile_picture 
+                            ? Storage::url($user->profile_picture) 
+                            : null
+                    ]
+                ]);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Failed to update profile. Please try again later.'
+            ], 500);
+        }
+    }
+
 
 
     public function updateStatus(Request $request, $user_id)

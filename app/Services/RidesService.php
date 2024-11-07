@@ -11,13 +11,22 @@ class RidesService
 {
     public function getAvailableRides()
     {
-        $availableRides = RideHistory::where('ride_histories.status', 'Available') 
+        // Fetch available rides along with user and ride location details
+        $availableRides = RideHistory::where('ride_histories.status', 'Available')
             ->join('users', 'ride_histories.user_id', '=', 'users.user_id')
-            ->select('ride_histories.*', 'users.first_name', 'users.last_name')
+            ->join('ride_locations', 'ride_histories.ride_id', '=', 'ride_locations.ride_id') // Join RideLocation
+            ->select(
+                'ride_histories.*',
+                'users.first_name',
+                'users.last_name',
+                'ride_locations.customer_latitude',
+                'ride_locations.customer_longitude',
+                'ride_locations.dropoff_latitude',
+                'ride_locations.dropoff_longitude'
+            )
             ->orderBy('ride_histories.created_at', 'desc')
-            ->with(['user', 'rideLocations'])
             ->get();
-    
-        return ($availableRides);
+
+        return $availableRides;
     }
 }

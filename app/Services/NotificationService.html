@@ -1,0 +1,75 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\RideApplication;
+use App\Models\User;
+use App\Models\RideHistory;
+use Pusher\Pusher;
+
+class NotificationService
+{
+    protected $pusher;
+
+    public function __construct()
+    {
+        $this->pusher = new Pusher(
+            env('PUSHER_APP_KEY'),
+            env('PUSHER_APP_SECRET'),
+            env('PUSHER_APP_ID'),
+            [
+                'cluster' => env('PUSHER_APP_CLUSTER'),
+                'useTLS' => true,
+            ]
+        );
+    }
+
+    public function notifyUsers(RideApplication $application)
+    {
+        // Get user details for better notification content
+        $applier = User::find($application->applier);
+        $applyTo = User::find($application->apply_to);
+        $ride = RideHistory::find($application->ride_id);
+
+        // Common ride details
+        $rideDetails = [
+            'apply_id' => $application->apply_id,
+            'ride_id' => $application->ride_id,
+            'date' => $application->date,
+            'pickup' => $ride->pickup_location,
+            'dropoff' => $ride->dropoff_location,
+        ];
+
+        // Notify applier
+        $this->pusher->trigger('notifications', 'NEW_NOTIFICATION', [
+            'userId' => $application->applier,
+            'type' => 'RIDE_MATCHED',
+            'title' => 'Ride Match Found!',
+            'message' => "You've been matched with {$applyTo->name} for your ride!",
+            'actionUrl' => 'RideDetailsScreen',
+            'rideDetails' => $rideDetails,
+            'otherUser' => [
+                'id' => $applyTo->id,
+                'name' => $applyTo->name,
+                'phone' => $applyTo->phone,
+            ],
+            'timestamp' => now(),
+        ]);
+
+        // Notify apply_to user
+        $this->pusher->trigger('notifications', 'NEW_NOTIFICATION', [
+            'userId' => $application->apply_to,
+            'type' => 'RIDE_MATCHED',
+            'title' => 'Ride Match Found!',
+            'message' => "You've been matched with {$applier->name} for your ride!",
+            'actionUrl' => 'RideDetailsScreen',
+            'rideDetails' => $rideDetails,
+            'otherUser' => [
+                'id' => $applier->id,
+                'name' => $applier->name,
+                'phone' => $applier->phone,
+            ],
+            'timestamp' => now(),
+        ]);
+    }
+}

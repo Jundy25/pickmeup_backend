@@ -45,10 +45,12 @@ Route::prefix('/user')->group(function() {
 
 
 
+
     
     Route::put('rider_available', [RiderController::class, 'updateAvailability']);
     Route::put('rider/{user_id}/status', [CustomerController::class, 'updateStatus']);
     Route::get('/available-rides', [RiderController::class, 'getAvailableRides']);
+    Route::get('/apply/{userId}', [RiderController::class, 'getApplications']);
     Route::get('riderId/{user_id}', [RiderController::class, 'getRiderById']);
     Route::put('/accept_ride/{ride_id}', [RiderController::class, 'accept_ride']);
     Route::post('/apply_ride/{ride_id}', [RiderController::class, 'apply_ride']);
@@ -67,14 +69,18 @@ Route::prefix('/user')->group(function() {
     Route::put('/complete_ride/{ride_id}', [CustomerController::class, 'finish_ride']);
     Route::get('/riders_apply', [CustomerController::class, 'viewApplications']);
     Route::get('/riders_loc', [CustomerController::class, 'getRiderLocations']);
+    Route::post('/apply_rider/{ride_id}', [CustomerController::class, 'apply_rider']);
+    
 
     Route::get('/admin', [AdminController::class, 'getAdmin']);
-    Route::get('/admin/{id}', [AdminController::class, 'show']);
+    Route::get('adminId/{user_id}', [AdminController::class, 'getAdminById']);
     Route::put('admin/{user_id}/status', [AdminController::class, 'updateStatus']);
     Route::put('/update_admin/{id}', [AdminController::class, 'updateAdmin']);
+    Route::put('update_account/{userId}', [AdminController::class, 'updateProfile'])->middleware('auth:sanctum');
     Route::put('/verify_rider/{user_id}', [AdminController::class, 'verify_rider']);
     Route::get('/riders/locations', [AdminController::class, 'getRiderLocations']);
-    
+    // Route::middleware('auth:api')->put('/update_account/{userId}', [AdminController::class, 'updateProfile']);
+
     
     Route::get('/history', [HistoryController::class, 'index']);
     Route::get('/cus_history/{user_id}', [HistoryController::class, 'customerHistory']);
@@ -86,6 +92,11 @@ Route::prefix('/user')->group(function() {
 
     
 
+
+    Route::post('/broadcasting/auth', function (Request $request) {
+        return Broadcast::auth($request);
+    })->middleware('auth:api');
+    
     // routes/channels.php
     Broadcast::channel('dashboard', function ($user) {
         return true; // Modify based on your authentication needs

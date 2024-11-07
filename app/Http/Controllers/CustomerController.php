@@ -14,6 +14,9 @@ use Illuminate\Support\Facades\Log;
 
 use App\Events\RidesUpdated;
 use App\Events\DashboardUpdated;
+use App\Events\RideApply;
+// use App\Events\NewNotification;
+
 
 use App\Services\DashboardService;
 use App\Services\RidesService;
@@ -34,6 +37,7 @@ class CustomerController extends Controller
         RidesService $ridesService,
         FareService $fareService)
         // NotificationService $notificationService
+        
     {
         $this->dashboardService = $dashboardService;
         $this->ridesService = $ridesService;
@@ -126,6 +130,14 @@ class CustomerController extends Controller
     {
         $activeRide = RideHistory::where('user_id', $user_id)
             ->whereIn('status', ['Available', 'Booked', 'In Transit', 'Review'])
+            ->join('ride_locations', 'ride_histories.ride_id', '=', 'ride_locations.ride_id')
+            ->select(
+                'ride_histories.*',
+                'ride_locations.customer_latitude',
+                'ride_locations.customer_longitude',
+                'ride_locations.dropoff_latitude',
+                'ride_locations.dropoff_longitude'
+            )
             ->with(['user', 'rider'])
             ->latest()
             ->first();
@@ -147,7 +159,7 @@ class CustomerController extends Controller
             ->map(function ($application) {
                 // Fetch only first_name and last_name for the applier
                 $applierDetails = \DB::table('users')
-                    ->select('first_name', 'last_name')
+                    ->select('user_id', 'first_name', 'last_name')
                     ->where('user_id', $application->applier)
                     ->first();
                 $applierLoc = \DB::table('riders')
@@ -166,29 +178,113 @@ class CustomerController extends Controller
     }
 
 
-    public function accept_ride(Request $request, $ride_id)
+    // public function accept_ride(Request $request, $ride_id)
+    // {
+    //     Log::info("Attempting to accept ride with ID: " . $ride_id);
+
+    //     try {
+    //         return DB::transaction(function () use ($ride_id, $request) {
+    //             // Validate that user_id is provided
+    //             $validated = $request->validate([
+    //                 'user_id' => 'required|exists:users,user_id',
+    //             ]);
+
+    //             $user_id = $validated['user_id'];
+
+    //             $application = RideApplication::where('ride_id', $ride_id)
+    //                             ->where('status', 'Matched')
+    //                             ->lockForUpdate()
+    //                             ->first();
+    //             if (!$application) {
+    //                 Log::warning("Ride not available for acceptance: " . $ride_id);
+    //                 return response()->json(['message' => 'This ride is no longer available.'], 200);
+    //             }     
+    //             $application->status = 'Matched';
+    //             $application->save();   
+
+    //             $ride = RideHistory::where('ride_id', $ride_id)
+    //                             ->where('status', 'Available')
+    //                             ->lockForUpdate()
+    //                             ->first();
+
+    //             if (!$ride) {
+    //                 Log::warning("Ride not available for acceptance: " . $ride_id);
+    //                 return response()->json(['message' => 'This ride is no longer available.'], 200);
+    //             }
+                
+    //             // Update the ride status and assign the rider_id
+    //             $ride->status = 'Booked';
+    //             $ride->rider_id = $user_id;
+    //             $ride->save();
+
+    //             event(new RidesBooked($ride));
+
+
+
+    //             Log::info("Ride accepted successfully: " . $ride_id);
+    //             return response()->json(['message' => 'Ride Accepted Successfully.']);
+    //         });
+    //     } catch (\Exception $e) {
+    //         Log::error("Failed to accept ride: " . $e->getMessage());
+    //         return response()->json(['error' => 'Failed to accept ride. Please try again.'], 500);
+    //     }
+    // }
+
+
+    private function updateRideHistory($ride_id, $rider_id)
     {
-        Log::info("Attempting to accept ride with ID: " . $ride_id);
+
+        $ride = RideHistory::where('ride_id', $ride_id)
+                                ->where('status', 'Available')
+                                ->lockForUpdate()
+                                ->first();
+        if ($ride) {
+
+            $apply = RideApplication::where('ride_id', $ride_id)
+                                ->where('status', 'Matched')
+                                ->where('apply_to', $rider_id);
+
+            if($apply){
+                // broadcast(new RideApply($apply));
+                $rides = $this->ridesService->getAvailableRides();
+                event(new RidesUpdated($rides));
+
+                
+            }
+
+
+            $ride->rider_id = $rider_id ;
+            $ride->status = "Booked";
+            $ride->save();
+
+            $data = $this->dashboardService->getCounts();
+                $counts = $data['counts'];
+                $bookings = $data['bookings'];
+                
+                event(new DashboardUpdated($counts, $bookings));
+
+
+            
+            Log::info("Ride history updated successfully for ride ID: " . $ride_id);
+        } else {
+            Log::warning("Ride history not found for ride ID: " . $ride_id);
+        }
+    }
+
+
+    public function apply_rider(Request $request, $ride_id)
+    {
+        Log::info("Attempting to apply ride with ID: " . $ride_id);
 
         try {
             return DB::transaction(function () use ($ride_id, $request) {
-                // Validate that user_id is provided
                 $validated = $request->validate([
                     'user_id' => 'required|exists:users,user_id',
+                    'rider_id' => 'required',
                 ]);
 
                 $user_id = $validated['user_id'];
-
-                $application = RideApplication::where('ride_id', $ride_id)
-                                ->where('status', 'Matched')
-                                ->lockForUpdate()
-                                ->first();
-                if (!$application) {
-                    Log::warning("Ride not available for acceptance: " . $ride_id);
-                    return response()->json(['message' => 'This ride is no longer available.'], 200);
-                }     
-                $application->status = 'Matched';
-                $application->save();   
+                $rider_id = $validated['rider_id'];
 
                 $ride = RideHistory::where('ride_id', $ride_id)
                                 ->where('status', 'Available')
@@ -200,23 +296,86 @@ class CustomerController extends Controller
                     return response()->json(['message' => 'This ride is no longer available.'], 200);
                 }
 
-                // Update the ride status and assign the rider_id
-                $ride->status = 'Booked';
-                $ride->rider_id = $user_id;
-                $ride->save();
+                $check = RideApplication::where('ride_id', $ride_id)
+                                ->where('applier', $user_id)
+                                ->where('apply_to', $rider_id)
+                                ->where('status', 'Pending')
+                                ->lockForUpdate()
+                                ->first();
 
-                event(new RidesBooked($ride));
+                if ($check) {
+                    Log::warning("You have already applied for this ride: " . $ride_id);
+                    return response()->json(['message' => 'exist'], 200);
+                }
 
+                $accept = RideApplication::where('ride_id', $ride_id)
+                                ->where('apply_to', $user_id)
+                                ->lockForUpdate()
+                                ->first();
 
+                if ($accept) {
+                    $accept->status = 'Matched';
+                    $accept->save();
 
-                Log::info("Ride accepted successfully: " . $ride_id);
-                return response()->json(['message' => 'Ride Accepted Successfully.']);
+                    $this->updateRideHistory($ride_id, $rider_id);
+
+                    Log::info("Ride Matched successfully: " . $ride_id);
+                    return response()->json(['message' => 'Accepted Successfully.']);
+                }
+
+                $apply = new RideApplication();
+                $apply->ride_id = $ride_id;
+                $apply->applier = $user_id;
+                $apply->status = 'Pending';
+                $apply->apply_to = $rider_id;
+                $apply->date = now();
+                $apply->save();
+
+                $user = User::where('user_id', $user_id)
+                    ->first(['first_name', 'last_name', 'mobile_number', 'status']);
+                Log::info("User: " . $user->first_name);
+
+                // Fetch complete ride data including locations
+                $completeRideData = RideHistory::join('users', 'ride_histories.user_id', '=', 'users.user_id')
+                    ->join('ride_locations', 'ride_histories.ride_id', '=', 'ride_locations.ride_id')
+                    ->where('ride_histories.ride_id', $ride_id)
+                    ->select(
+                        'ride_histories.*',
+                        'users.first_name',
+                        'users.last_name',
+                        'ride_locations.customer_latitude',
+                        'ride_locations.customer_longitude',
+                        'ride_locations.dropoff_latitude',
+                        'ride_locations.dropoff_longitude'
+                    )
+                    ->first();
+
+                // Create payload with matching structure
+                $applicationData = collect([
+                    array_merge($completeRideData->toArray(), [
+                        'apply_id' => $apply->apply_id,
+                        'applier' => $apply->applier,
+                        'apply_to' => $apply->apply_to,
+                        'applier_name' => $user->first_name . ' ' . $user->last_name,
+                    ])
+                ]);
+
+                // Log the complete payload
+                Log::info("Broadcasting Ride Data: " . json_encode($applicationData));
+
+                // Broadcast the event
+                event(new RideApply($applicationData));
+
+                Log::info("Ride Application successfully: " . $ride_id);
+                return response()->json(['message' => 'Applied Successfully.']);
             });
         } catch (\Exception $e) {
-            Log::error("Failed to accept ride: " . $e->getMessage());
-            return response()->json(['error' => 'Failed to accept ride. Please try again.'], 500);
+            Log::error("Failed to apply ride: " . $e->getMessage());
+            Log::error("Exception stack trace: " . $e->getTraceAsString()); // Add this for more detailed error info
+            return response()->json(['error' => 'Failed to apply ride. Please try again.'], 500);
         }
     }
+    
 
     
 
