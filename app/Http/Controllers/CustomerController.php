@@ -128,6 +128,21 @@ class CustomerController extends Controller
 
     public function checkActiveRide($user_id)
     {
+
+        // $activeRide = RideHistory::where('ride_histories.rider_id', $user_id)
+        // ->whereIn('ride_histories.status', ['Available', 'Booked', 'In Transit', 'Review'])
+        // ->join('users', 'ride_histories.user_id', '=', 'users.user_id') // Join with users
+        // ->join('riders', 'users.user_id', '=', 'riders.user_id') // Join with riders via users
+        // ->with(['user', 'ridelocations']) // Load other relationships as usual
+        // ->select(
+        //     'ride_histories.*',
+        //     'riders.rider_latitude',
+        //     'riders.rider_longitude',
+        //     'riders.availability'
+        // ) // Select specific fields from riders if needed
+        // ->latest('ride_histories.created_at')
+        // ->first();
+
         $activeRide = RideHistory::where('user_id', $user_id)
             ->whereIn('status', ['Available', 'Booked', 'In Transit', 'Review'])
             ->join('ride_locations', 'ride_histories.ride_id', '=', 'ride_locations.ride_id')
@@ -178,59 +193,6 @@ class CustomerController extends Controller
     }
 
 
-    // public function accept_ride(Request $request, $ride_id)
-    // {
-    //     Log::info("Attempting to accept ride with ID: " . $ride_id);
-
-    //     try {
-    //         return DB::transaction(function () use ($ride_id, $request) {
-    //             // Validate that user_id is provided
-    //             $validated = $request->validate([
-    //                 'user_id' => 'required|exists:users,user_id',
-    //             ]);
-
-    //             $user_id = $validated['user_id'];
-
-    //             $application = RideApplication::where('ride_id', $ride_id)
-    //                             ->where('status', 'Matched')
-    //                             ->lockForUpdate()
-    //                             ->first();
-    //             if (!$application) {
-    //                 Log::warning("Ride not available for acceptance: " . $ride_id);
-    //                 return response()->json(['message' => 'This ride is no longer available.'], 200);
-    //             }     
-    //             $application->status = 'Matched';
-    //             $application->save();   
-
-    //             $ride = RideHistory::where('ride_id', $ride_id)
-    //                             ->where('status', 'Available')
-    //                             ->lockForUpdate()
-    //                             ->first();
-
-    //             if (!$ride) {
-    //                 Log::warning("Ride not available for acceptance: " . $ride_id);
-    //                 return response()->json(['message' => 'This ride is no longer available.'], 200);
-    //             }
-                
-    //             // Update the ride status and assign the rider_id
-    //             $ride->status = 'Booked';
-    //             $ride->rider_id = $user_id;
-    //             $ride->save();
-
-    //             event(new RidesBooked($ride));
-
-
-
-    //             Log::info("Ride accepted successfully: " . $ride_id);
-    //             return response()->json(['message' => 'Ride Accepted Successfully.']);
-    //         });
-    //     } catch (\Exception $e) {
-    //         Log::error("Failed to accept ride: " . $e->getMessage());
-    //         return response()->json(['error' => 'Failed to accept ride. Please try again.'], 500);
-    //     }
-    // }
-
-
     private function updateRideHistory($ride_id, $rider_id)
     {
 
@@ -256,6 +218,14 @@ class CustomerController extends Controller
             $ride->rider_id = $rider_id ;
             $ride->status = "Booked";
             $ride->save();
+
+            $rider_status = Rider::where('user_id', $rider_id)
+                ->lockForUpdate()
+                ->first();
+
+            $rider_status->availability = "Booked";
+            $rider_status->save();
+
 
             $data = $this->dashboardService->getCounts();
                 $counts = $data['counts'];
@@ -367,7 +337,7 @@ class CustomerController extends Controller
                 event(new RideApply($applicationData));
 
                 Log::info("Ride Application successfully: " . $ride_id);
-                return response()->json(['message' => 'Applied Successfully.']);
+                return response()->json(['message' => 'applied'], 200);
             });
         } catch (\Exception $e) {
             Log::error("Failed to apply ride: " . $e->getMessage());
@@ -388,6 +358,20 @@ class CustomerController extends Controller
 
         return response()->json($riders);
     }
+
+    public function getRiderLocationById($rider_id)
+    {
+        // Get the first rider that matches the given user_id
+        $rider = Rider::where('user_id', $rider_id)
+            ->first();
+
+        if ($rider) {
+            return response()->json($rider); // Return the rider as JSON if found
+        } else {
+            return response()->json(['message' => 'Rider not found'], 404); // Handle case where rider is not found
+        }
+    }
+
     
 
     public function cancelRide(Request $request, $ride_id)

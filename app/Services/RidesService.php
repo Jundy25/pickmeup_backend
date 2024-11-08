@@ -19,11 +19,13 @@ class RidesService
                 'ride_histories.*',
                 'users.first_name',
                 'users.last_name',
+                'users.mobile_number',
                 'ride_locations.customer_latitude',
                 'ride_locations.customer_longitude',
                 'ride_locations.dropoff_latitude',
                 'ride_locations.dropoff_longitude'
             )
+            ->with('user')
             ->orderBy('ride_histories.created_at', 'desc')
             ->get();
 

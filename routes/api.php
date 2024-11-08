@@ -52,8 +52,8 @@ Route::prefix('/user')->group(function() {
     Route::get('/available-rides', [RiderController::class, 'getAvailableRides']);
     Route::get('/apply/{userId}', [RiderController::class, 'getApplications']);
     Route::get('riderId/{user_id}', [RiderController::class, 'getRiderById']);
-    Route::put('/accept_ride/{ride_id}', [RiderController::class, 'accept_ride']);
     Route::post('/apply_ride/{ride_id}', [RiderController::class, 'apply_ride']);
+    Route::put('/decline_ride/{apply_id}', [RiderController::class, 'decline_ride']);
     Route::get('check-active-ride/{user_id}', [RiderController::class, 'checkActiveRide']);
     Route::put('/start_ride/{ride_id}', [RiderController::class, 'start_ride']);
     Route::put('/finish_ride/{ride_id}', [RiderController::class, 'finish_ride']);
@@ -69,6 +69,7 @@ Route::prefix('/user')->group(function() {
     Route::put('/complete_ride/{ride_id}', [CustomerController::class, 'finish_ride']);
     Route::get('/riders_apply', [CustomerController::class, 'viewApplications']);
     Route::get('/riders_loc', [CustomerController::class, 'getRiderLocations']);
+    Route::get('/rider_loc_id/{rider_id}', [CustomerController::class, 'getRiderLocationById']);
     Route::post('/apply_rider/{ride_id}', [CustomerController::class, 'apply_rider']);
     
 

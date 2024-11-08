@@ -21,6 +21,7 @@ class RideBooked implements ShouldBroadcastNow
     public function __construct($ride)
     {
         $this->ride = $ride;
+        Log::info("FUCK Ride Data: " . json_encode($ride));
     }
 
     public function broadcastOn()
